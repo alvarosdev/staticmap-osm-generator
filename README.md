@@ -1,130 +1,183 @@
 # staticmap-osm-generator
 
-## Disclaimer
-- This repository is a proof of concept.
-- It should not be used in production environments.
+> ⚠️ **Proof of concept** – Not intended for production use.
 
-To install dependencies:
+HTTP server that generates cached PNG map tiles from OpenStreetMap with custom markers.
+
+## Background
+
+This project was created as a proof of concept to display earthquake coordinates in a user-friendly visual format. Instead of showing raw latitude/longitude data, it generates map images with markers indicating the exact location of seismic events, making the information more accessible and intuitive for end users.
+
+## Features
+
+- 🗺️ Single-endpoint API for map generation
+- 💾 Content-based caching system
+- ⚙️ YAML and environment variable configuration
+- 🎨 Customizable marker styling
+
+## Quick Start
+
+### Using Docker (Recommended)
+
+Pull and run the pre-built image from GitHub Container Registry:
 
 ```bash
+docker pull ghcr.io/alvarosdev/staticmap-osm-generator:latest
+
+docker run -p 3000:3000 \
+  -v $(pwd)/assets:/app/assets \
+  ghcr.io/alvarosdev/staticmap-osm-generator:latest
+```
+
+Or using docker-compose:
+
+```bash
+docker-compose up
+```
+
+### Local Development
+
+```bash
+# Install dependencies
 bun install
-```
 
-To run:
-
-```bash
-bun run index.ts
-```
-
-This project was created using `bun init` in bun v1.3.0. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
-
-# Overview
-A minimal HTTP server built with Bun that generates or serves cached PNG map tiles from OpenStreetMap. Given a latitude, longitude, and zoom, the server stitches the necessary OSM tiles into a single 256×256 image and draws a visible marker at the center.
-
-# Features
-- **/map endpoint** serving a single PNG image per request.
-- **Caching** to the local `assets/` directory using a content hash of `zoom, lat, lon`.
-- **Configurable** via `config.yaml` and environment variables.
-- **Pretty logging** in development with `pino` and `pino-pretty`.
-
-# Requirements
-- **Bun** v1.3.0 or newer
-- Internet access to fetch OSM tiles (default `https://tile.openstreetmap.org`)
-
-# Installation
-Install dependencies with Bun:
-
-```bash
-bun install
-```
-
-# Running
-Development (watches files, pretty logs):
-
-```bash
+# Development mode (with hot reload)
 bun run dev
-```
 
-Production:
-
-```bash
+# Production mode
 bun run start
 ```
 
-By default the server listens on `http://localhost:3000` (configurable).
+Server runs on `http://localhost:3000` by default.
 
-# API
-## GET `/map`
-Returns a `image/png` with a single map tile centered at the requested coordinates.
+## API Endpoints
 
-Query parameters:
-- `lat` number. Range: `-90` to `90`.
-- `lon` number. Range: `-180` to `180`.
-- `zoom` integer. Range: `minZoom`–`maxZoom` from config (defaults `0–20`).
+The server exposes a single endpoint for map generation:
 
-Example:
+### `GET /map`
 
+Generates a 256×256 PNG map tile with a centered marker at the specified coordinates.
+
+**Query Parameters:**
+| Parameter | Type    | Range          | Description                    |
+|-----------|---------|----------------|--------------------------------|
+| `lat`     | number  | `-90` to `90`  | Latitude coordinate            |
+| `lon`     | number  | `-180` to `180`| Longitude coordinate           |
+| `zoom`    | integer | `0` to `20`    | Zoom level (higher = more detail) |
+
+**Example Request:**
 ```bash
-curl "http://localhost:3000/map?lat=-34.6037&lon=-58.3816&zoom=12" --output map.png
+# Buenos Aires, Argentina at zoom level 12
+curl "http://localhost:3000/map?lat=-34.6037&lon=-58.3816&zoom=12" -o map.png
+
+# New York City, USA at zoom level 15
+curl "http://localhost:3000/map?lat=40.7128&lon=-74.0060&zoom=15" -o nyc.png
 ```
 
-- On success: `200 OK` with PNG body.
-- On invalid input: `400 Bad Request` with a message.
-- On unexpected errors: `500 Internal Server Error`.
+**Responses:**
+- `200 OK` – Returns PNG image (Content-Type: `image/png`)
+- `400 Bad Request` – Invalid or missing parameters
+- `500 Internal Server Error` – Server-side error
 
-# Configuration
-Configuration is loaded from `config.yaml` at startup. Environment variables can override some fields.
+**How it works:**
+1. Server validates input parameters
+2. Checks if cached image exists for these coordinates
+3. If not cached, fetches OSM tiles and generates the image
+4. Draws a custom marker at the center point
+5. Saves to cache and returns the PNG
 
-Default fields (`src/config/config.ts`):
-- `port` (default `3000`)
-- `assetsDir` (default `assets`)
-- `tileSize` (default `256`)
-- `osmBaseUrl` (default `https://tile.openstreetmap.org`)
-- `marker` styling (radius, colors)
-- `minZoom`/`maxZoom` (default `0/20`)
+## Caching System
 
-Example `config.yaml`:
+The server implements an intelligent caching mechanism to improve performance and reduce load on OSM tile servers:
+
+- **Cache Location**: Images are stored in the `assets/` directory
+- **Cache Key**: Content hash generated from `zoom`, `lat`, and `lon` parameters
+- **Cache Strategy**: 
+  - First request: Fetches OSM tiles, generates image, saves to cache
+  - Subsequent requests: Serves directly from cache (instant response)
+- **Persistence**: When using Docker, mount a volume to persist cache between container restarts
+
+**Docker volume mount example:**
+```bash
+docker run -p 3000:3000 -v $(pwd)/assets:/app/assets ghcr.io/alvarosdev/staticmap-osm-generator:latest
+```
+
+This ensures your cached maps persist even if you restart or recreate the container.
+
+## Configuration
+
+Edit `config.yaml` or use environment variables:
 
 ```yaml
-port: 3000
-assetsDir: assets
-tileSize: 256
+port: 3000                                    # PORT
+assetsDir: assets                             # ASSETS_DIR
 osmBaseUrl: https://tile.openstreetmap.org
 marker:
   radius: 8
   fillColor: "#e53935"
   borderColor: "black"
-  shadowColor: "rgba(255,255,255,0.9)"
-  crossColor: "white"
-maxZoom: 20
-minZoom: 0
 ```
 
-Env var overrides:
-- `PORT`
-- `ASSETS_DIR`
+**Environment Variables:**
+- `PORT` – Server port (default: `3000`)
+- `ASSETS_DIR` – Cache directory path (default: `assets`)
+- `NODE_ENV` – Environment mode (`development` or `production`)
 
-# Caching
-Generated images are stored in `assets/` using a content hash derived from `zoom,lat,lon` (`src/core/hash.ts`). If a file already exists, it is served directly.
+## Docker Deployment
 
-# Logging
-Logging is handled by `pino` (`src/server/logger.ts`).
-- In development (`NODE_ENV=development`): pretty logs via `pino-pretty`.
-- In production: structured logs at `error` level.
+### Using Pre-built Image
 
-# Build
-Build the server entry (`src/server/index.ts`) to `dist/`:
+The easiest way to run this project is using the official Docker image:
 
 ```bash
-bun run build
+# Pull the latest image
+docker pull ghcr.io/alvarosdev/staticmap-osm-generator:latest
+
+# Run with cache persistence
+docker run -d \
+  --name staticmap-server \
+  -p 3000:3000 \
+  -v $(pwd)/assets:/app/assets \
+  -e PORT=3000 \
+  ghcr.io/alvarosdev/staticmap-osm-generator:latest
 ```
 
-# Project Structure
-- `src/server/index.ts` Bun server and routing (`/map`).
-- `src/core/tile.ts` Tile math, image fetching, drawing, and marker rendering.
-- `src/config/config.ts` Load config from YAML and env; export `CONFIG`.
-- `src/server/logger.ts` Logger configuration.
-- `assets/` Cache directory for generated PNGs.
+### Using Docker Compose
 
-# License
-This project uses OpenStreetMap tiles. Respect OSM tile usage policies and attribution requirements. Choose and add a license file as appropriate for your project.
+Create or use the included `docker-compose.yml`:
+
+```yaml
+version: '3.8'
+services:
+  staticmap:
+    image: ghcr.io/alvarosdev/staticmap-osm-generator:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./assets:/app/assets
+    environment:
+      - NODE_ENV=production
+```
+
+Then run:
+```bash
+docker-compose up -d
+```
+
+### Building Your Own Image
+
+```bash
+docker build -t staticmap-osm-generator .
+docker run -p 3000:3000 staticmap-osm-generator
+```
+
+## Requirements
+
+- **Docker** (recommended) or [Bun](https://bun.sh) v1.3.0+
+- Internet access to fetch OSM tiles
+
+## License
+
+MIT License – See [LICENSE](LICENSE) file.
+
+**Note:** This project uses OpenStreetMap tiles. Please respect [OSM tile usage policies](https://operations.osmfoundation.org/policies/tiles/).

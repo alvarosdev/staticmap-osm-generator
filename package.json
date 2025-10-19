@@ -3,6 +3,7 @@
   "module": "src/server/index.ts",
   "type": "module",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "dev": "NODE_ENV=development bun --watch run src/server/index.ts",
     "start": "NODE_ENV=production bun run src/server/index.ts"
