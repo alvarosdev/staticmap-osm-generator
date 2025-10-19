@@ -1,0 +1,21 @@
+version: "3.9"
+
+services:
+  staticmap:
+    build: .
+    container_name: staticmap-osm-generator
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - ASSETS_DIR=/app/assets
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./assets:/app/assets
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped

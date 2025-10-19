@@ -1,0 +1,12 @@
+port: 3000
+assetsDir: "assets"
+tileSize: 256
+osmBaseUrl: "https://tile.openstreetmap.org"
+marker:
+  radius: 8
+  fillColor: "#e53935"
+  borderColor: "black"
+  shadowColor: "rgba(255,255,255,0.9)"
+  crossColor: "white"
+maxZoom: 20
+minZoom: 0
