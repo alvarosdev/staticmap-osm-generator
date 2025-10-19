@@ -1,4 +1,4 @@
-import { parse } from "yaml";
+import { YAML } from 'bun';
 import type { Config } from "@/types/types.js";
 
 export let CONFIG: Config = {
@@ -20,7 +20,7 @@ export let CONFIG: Config = {
 export async function loadConfig(): Promise<void> {
   try {
     const configText = await Bun.file("config.yaml").text();
-    const config: Config = parse(configText) as Config;
+    const config: Config = YAML.parse(configText) as Config;
     // Override with env vars if present
     config.port = parseInt(Bun.env.PORT || config.port.toString(), 10);
     config.assetsDir = Bun.env.ASSETS_DIR || config.assetsDir;
