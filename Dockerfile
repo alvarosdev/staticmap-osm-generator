@@ -1,4 +1,4 @@
-FROM oven/bun:1.3.1
+FROM oven/bun:1.3
 
 LABEL maintainer="staticmap-osm-generator" \
       version="1.0" \
