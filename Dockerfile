@@ -13,6 +13,7 @@ RUN bun install --production --frozen-lockfile
 # Copy configuration, source, and assets
 COPY tsconfig.json config.yaml ./
 COPY src ./src
+COPY assets ./assets
 
 # Create assets directory if not exists
 RUN mkdir -p /app/assets
