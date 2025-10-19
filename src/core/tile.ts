@@ -1,5 +1,6 @@
 import { createCanvas, loadImage } from "canvas";
 import type { LatLonToTileResult, TileInfo, GenerateTileParams, Config } from "@/types/types.js";
+import { fetchTile } from "./tileFetcher.js";
 
 /**
  * Converts latitude and longitude to tile coordinates and pixel offsets.
@@ -50,15 +51,10 @@ export async function generateSingleTileMap({ lat, lon, zoom }: GenerateTilePara
       const clampedY = Math.min(Math.max(tileY, 0), n - 1);
       const drawX = col * tileSize - offsetX;
       const drawY = row * tileSize - offsetY;
-      const tileURL = `${config.osmBaseUrl}/${zoom}/${wrappedX}/${clampedY}.png`;
 
       tileFetches.push(
         (async (): Promise<TileInfo> => {
-          const res = await fetch(tileURL);
-          if (!res.ok) {
-            throw new Error(`Failed to download tile: ${tileURL} (${res.status})`);
-          }
-          const buf = Buffer.from(await res.arrayBuffer());
+          const buf = await fetchTile(zoom, wrappedX, clampedY, config.osmBaseUrl);
           const image = await loadImage(buf);
           return { image, drawX, drawY };
         })()

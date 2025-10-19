@@ -1,9 +1,10 @@
 /**
  * Generates a SHA-256 hash from zoom, lat, and lon.
+ * Uses Bun.CryptoHasher for optimal performance (synchronous, no allocations).
  */
-export async function generateHash(zoom: number, lat: number, lon: number): Promise<string> {
+export function generateHash(zoom: number, lat: number, lon: number): string {
   const input = `${zoom}${lat}${lon}`;
-  const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  const hasher = new Bun.CryptoHasher("sha256");
+  hasher.update(input);
+  return hasher.digest("hex");
 }

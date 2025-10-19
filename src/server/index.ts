@@ -1,29 +1,39 @@
-import { existsSync } from "node:fs";
 import { CONFIG, loadConfig } from "@/config/config.js";
 import { generateSingleTileMap } from "@/core/tile.js";
 import { generateHash } from "@/core/hash.js";
+import { getCacheStats } from "@/core/tileFetcher.js";
+import { initTileCache } from "@/core/tileCache.js";
 import { logger } from "./logger.js";
+import { getSecurityHeaders, validateNumber, validateInteger } from "./security.js";
 
 /**
  * Handles the map generation or serving from cache.
+ * Uses Bun.file().exists() instead of Node.js fs.existsSync for better performance.
  */
 async function handleMapRequest(lat: number, lon: number, zoom: number): Promise<Response> {
-  const hash = await generateHash(zoom, lat, lon);
+  const hash = generateHash(zoom, lat, lon);
   const filePath = `${CONFIG.assetsDir}/${hash}.png`;
+  const file = Bun.file(filePath);
 
-  if (existsSync(filePath)) {
+  if (await file.exists()) {
     logger.info({ hash, filePath }, 'Serving cached image');
-    const file = Bun.file(filePath);
     return new Response(file, {
-      headers: { "Content-Type": "image/png" },
+      headers: {
+        "Content-Type": "image/png",
+        "Cache-Control": "public, max-age=31536000, immutable",
+        ...getSecurityHeaders(CONFIG.cors!),
+      },
     });
   } else {
     logger.info({ hash }, 'Generating new image');
     const pngBuffer = await generateSingleTileMap({ lat, lon, zoom }, CONFIG);
     await Bun.write(filePath, pngBuffer);
-    const file = Bun.file(filePath);
-    return new Response(file, {
-      headers: { "Content-Type": "image/png" },
+    return new Response(Bun.file(filePath), {
+      headers: {
+        "Content-Type": "image/png",
+        "Cache-Control": "public, max-age=31536000, immutable",
+        ...getSecurityHeaders(CONFIG.cors!),
+      },
     });
   }
 }
@@ -31,39 +41,99 @@ async function handleMapRequest(lat: number, lon: number, zoom: number): Promise
 // Bun server
 (async () => {
   await loadConfig();
+  
+  // Initialize tile cache with config
+  const cacheConfig = CONFIG.cache || { maxSize: 1000, ttlMinutes: 60 };
+  initTileCache(cacheConfig.maxSize, cacheConfig.ttlMinutes);
+  logger.info({ cacheConfig }, 'Tile cache initialized');
 
-  Bun.serve({
+  const server = Bun.serve({
     port: CONFIG.port,
-    async fetch(request) {
+    // Static routes for zero-allocation responses
+    routes: {
+      "/health": new Response("OK", {
+        status: 200,
+        headers: getSecurityHeaders(CONFIG.cors!),
+      }),
+    },
+    async fetch(request, server) {
       const url = new URL(request.url);
-      logger.info({ method: request.method, url: url.toString() }, 'Incoming request');
-      if (url.pathname === "/map" && request.method === "GET") {
-        const lat = parseFloat(url.searchParams.get("lat") || "");
-        const lon = parseFloat(url.searchParams.get("lon") || "");
-        const zoom = parseInt(url.searchParams.get("zoom") || "", 10);
+      
+      // Handle CORS preflight
+      if (request.method === "OPTIONS") {
+        return new Response(null, {
+          status: 204,
+          headers: getSecurityHeaders(CONFIG.cors!),
+        });
+      }
 
-        // Validation
-        if (isNaN(lat) || lat < -90 || lat > 90) {
-          logger.warn({ lat }, 'Invalid latitude');
-          return new Response("Invalid latitude (must be between -90 and 90)", { status: 400 });
+      logger.info({ method: request.method, url: url.toString() }, 'Incoming request');
+      
+      if (url.pathname === "/map" && request.method === "GET") {
+        // Validate input parameters
+        const latValidation = validateNumber(url.searchParams.get("lat"), -90, 90, "latitude");
+        if (!latValidation.valid) {
+          logger.warn({ error: latValidation.error }, 'Invalid latitude');
+          return new Response(latValidation.error, {
+            status: 400,
+            headers: { "Content-Type": "text/plain", ...getSecurityHeaders(CONFIG.cors!) },
+          });
         }
-        if (isNaN(lon) || lon < -180 || lon > 180) {
-          logger.warn({ lon }, 'Invalid longitude');
-          return new Response("Invalid longitude (must be between -180 and 180)", { status: 400 });
+
+        const lonValidation = validateNumber(url.searchParams.get("lon"), -180, 180, "longitude");
+        if (!lonValidation.valid) {
+          logger.warn({ error: lonValidation.error }, 'Invalid longitude');
+          return new Response(lonValidation.error, {
+            status: 400,
+            headers: { "Content-Type": "text/plain", ...getSecurityHeaders(CONFIG.cors!) },
+          });
         }
-        if (isNaN(zoom) || zoom < CONFIG.minZoom || zoom > CONFIG.maxZoom) {
-          logger.warn({ zoom }, 'Invalid zoom');
-          return new Response(`Invalid zoom (must be between ${CONFIG.minZoom} and ${CONFIG.maxZoom})`, { status: 400 });
+
+        const zoomValidation = validateInteger(
+          url.searchParams.get("zoom"),
+          CONFIG.minZoom,
+          CONFIG.maxZoom,
+          "zoom"
+        );
+        if (!zoomValidation.valid) {
+          logger.warn({ error: zoomValidation.error }, 'Invalid zoom');
+          return new Response(zoomValidation.error, {
+            status: 400,
+            headers: { "Content-Type": "text/plain", ...getSecurityHeaders(CONFIG.cors!) },
+          });
         }
+
+        const lat = latValidation.value!;
+        const lon = lonValidation.value!;
+        const zoom = zoomValidation.value!;
 
         try {
           return await handleMapRequest(lat, lon, zoom);
         } catch (error) {
           logger.error({ error: error instanceof Error ? error.message : String(error), lat, lon, zoom }, 'Error generating map');
-          return new Response("Internal Server Error", { status: 500 });
+          return new Response("Internal Server Error", {
+            status: 500,
+            headers: { "Content-Type": "text/plain", ...getSecurityHeaders(CONFIG.cors!) },
+          });
         }
       }
-      return new Response("Not Found", { status: 404 });
+
+      // Cache stats endpoint
+      if (url.pathname === "/stats" && request.method === "GET") {
+        const stats = getCacheStats();
+        return new Response(JSON.stringify(stats, null, 2), {
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-cache",
+            ...getSecurityHeaders(CONFIG.cors!),
+          },
+        });
+      }
+
+      return new Response("Not Found", {
+        status: 404,
+        headers: { "Content-Type": "text/plain", ...getSecurityHeaders(CONFIG.cors!) },
+      });
     },
   });
 

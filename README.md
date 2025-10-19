@@ -10,10 +10,14 @@ This project was created as a proof of concept to display earthquake coordinates
 
 ## Features
 
-- 🗺️ Single-endpoint API for map generation
-- 💾 Content-based caching system
+- 🗺️ Simple REST API for map generation
+- 💾 Dual-layer caching system (disk + memory)
+- 🚀 Optimized OSM tile fetching with automatic retries
+- 🔒 Configurable CORS and security headers
 - ⚙️ YAML and environment variable configuration
 - 🎨 Customizable marker styling
+- 📊 Built-in health check and monitoring endpoints
+- ⚡ Built with Bun for maximum performance
 
 ## Quick Start
 
@@ -52,8 +56,6 @@ Server runs on `http://localhost:3000` by default.
 
 ## API Endpoints
 
-The server exposes a single endpoint for map generation:
-
 ### `GET /map`
 
 Generates a 256×256 PNG map tile with a centered marker at the specified coordinates.
@@ -80,48 +82,172 @@ curl "http://localhost:3000/map?lat=40.7128&lon=-74.0060&zoom=15" -o nyc.png
 - `500 Internal Server Error` – Server-side error
 
 **How it works:**
-1. Server validates input parameters
-2. Checks if cached image exists for these coordinates
-3. If not cached, fetches OSM tiles and generates the image
-4. Draws a custom marker at the center point
-5. Saves to cache and returns the PNG
+1. Validates input parameters (latitude, longitude, zoom)
+2. Checks disk cache for existing image
+3. If not cached, fetches 4 OSM tiles in parallel (with memory cache)
+4. Composes tiles and draws custom marker at center
+5. Saves to disk cache and returns PNG with appropriate headers
+
+### `GET /health`
+
+Health check endpoint for monitoring and load balancers.
+
+**Response:**
+- `200 OK` – Server is healthy
+
+### `GET /stats`
+
+Returns cache statistics for monitoring performance.
+
+**Response:**
+```json
+{
+  "size": 450,
+  "maxSize": 1000
+}
+```
+
+- `size`: Current number of tiles in memory cache
+- `maxSize`: Maximum cache capacity
 
 ## Caching System
 
-The server implements an intelligent caching mechanism to improve performance and reduce load on OSM tile servers:
+The server implements a **dual-layer caching system** for optimal performance:
 
-- **Cache Location**: Images are stored in the `assets/` directory
-- **Cache Key**: Content hash generated from `zoom`, `lat`, and `lon` parameters
-- **Cache Strategy**: 
-  - First request: Fetches OSM tiles, generates image, saves to cache
-  - Subsequent requests: Serves directly from cache (instant response)
-- **Persistence**: When using Docker, mount a volume to persist cache between container restarts
+### 1. Disk Cache (Generated Maps)
+- **Location**: `assets/` directory
+- **Purpose**: Stores final generated map images
+- **Key**: Content hash from `zoom`, `lat`, `lon`
+- **Persistence**: Survives server restarts
+- **Strategy**: Check first, serve instantly if exists
+
+### 2. Memory Cache (OSM Tiles)
+- **Purpose**: Caches individual OSM tiles in RAM
+- **Type**: LRU (Least Recently Used) eviction
+- **Configuration**: 
+  ```yaml
+  cache:
+    maxSize: 1000      # Max tiles in memory
+    ttlMinutes: 60     # Time to live
+  ```
+- Helps reduce repeated requests to OSM servers
+- Automatic expiration and eviction of old tiles
 
 **Docker volume mount example:**
 ```bash
 docker run -p 3000:3000 -v $(pwd)/assets:/app/assets ghcr.io/alvarosdev/staticmap-osm-generator:latest
 ```
 
-This ensures your cached maps persist even if you restart or recreate the container.
+This ensures your disk cache persists between container restarts.
+
+## Security & Performance
+
+### Security Features
+- **CORS configurable** - Control allowed origins, methods, and headers via config
+- **Security headers** - X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, etc.
+- **Input validation** - Robust validation and sanitization of all parameters
+- **Cache headers** - Proper caching directives for optimal CDN/browser caching
+
+> **Note:** Rate limiting should be handled at the infrastructure level (e.g., Cloudflare, nginx)
+
+### Performance Optimizations
+
+**OSM Tile Fetching:**
+- In-memory LRU cache for OSM tiles with configurable size and TTL
+- Rate limiting (2 concurrent requests, 2 req/sec) to respect OSM policies
+- Automatic retries with exponential backoff (3 attempts: 1s → 2s → 4s)
+- Request timeouts (10s) and proper User-Agent identification
+- Parallel fetching of the 4 tiles needed per map
+
+**Bun Native APIs:**
+- `Bun.CryptoHasher` for fast synchronous hashing (~5x faster than Web Crypto)
+- Static routes for zero-allocation responses on `/health` endpoint
+- `Bun.file()` for optimized file I/O with automatic streaming
+- `Bun.write()` for fast file writing operations
+- Native gzip compression (automatic in Bun)
 
 ## Configuration
 
 Edit `config.yaml` or use environment variables:
 
 ```yaml
-port: 3000                                    # PORT
-assetsDir: assets                             # ASSETS_DIR
+port: 3000
+assetsDir: assets
+tileSize: 256
 osmBaseUrl: https://tile.openstreetmap.org
 marker:
   radius: 8
   fillColor: "#e53935"
   borderColor: "black"
+  shadowColor: "rgba(255,255,255,0.9)"
+  crossColor: "white"
+maxZoom: 20
+minZoom: 0
+
+# Tile cache configuration
+cache:
+  maxSize: 1000      # Maximum tiles in memory
+  ttlMinutes: 60     # Time to live in minutes
+
+# CORS configuration
+cors:
+  enabled: true                    # Enable/disable CORS
+  allowedOrigins: "*"              # Allowed origins (* for all)
+  allowedMethods: "GET, OPTIONS"   # Allowed HTTP methods
+  allowedHeaders: "Content-Type"   # Allowed headers
+  maxAge: 86400                    # Preflight cache duration (24 hours)
 ```
 
 **Environment Variables:**
-- `PORT` – Server port (default: `3000`)
-- `ASSETS_DIR` – Cache directory path (default: `assets`)
-- `NODE_ENV` – Environment mode (`development` or `production`)
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `PORT` | Server port | `3000` |
+| `ASSETS_DIR` | Cache directory path | `assets` |
+| `NODE_ENV` | Environment mode | `production` |
+| `CORS_ENABLED` | Enable CORS | `true` |
+| `CORS_ALLOWED_ORIGINS` | Allowed origins | `*` |
+| `CORS_ALLOWED_METHODS` | Allowed HTTP methods | `GET, OPTIONS` |
+| `CORS_ALLOWED_HEADERS` | Allowed headers | `Content-Type` |
+| `CORS_MAX_AGE` | Preflight cache duration (seconds) | `86400` |
+
+### CORS Configuration Examples
+
+**Public API (default):**
+```yaml
+cors:
+  enabled: true
+  allowedOrigins: "*"
+  allowedMethods: "GET, OPTIONS"
+  allowedHeaders: "Content-Type"
+  maxAge: 86400
+```
+
+**Specific domain:**
+```yaml
+cors:
+  enabled: true
+  allowedOrigins: "https://example.com"
+  allowedMethods: "GET, OPTIONS"
+  allowedHeaders: "Content-Type"
+  maxAge: 86400
+```
+
+**Multiple domains (via environment variable):**
+```bash
+CORS_ALLOWED_ORIGINS="https://example.com, https://app.example.com"
+```
+
+**Disable CORS (behind Cloudflare/nginx):**
+```yaml
+cors:
+  enabled: false
+```
+
+Or via environment variable:
+```bash
+CORS_ENABLED=false
+```
 
 ## Docker Deployment
 
@@ -144,22 +270,38 @@ docker run -d \
 
 ### Using Docker Compose
 
-Create or use the included `docker-compose.yml`:
+The included `docker-compose.yml` has all configuration ready:
 
 ```yaml
-version: '3.8'
+version: "3.9"
 services:
   staticmap:
-    image: ghcr.io/alvarosdev/staticmap-osm-generator:latest
+    build: .
+    container_name: staticmap-osm-generator
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - ASSETS_DIR=/app/assets
+      # CORS configuration (optional)
+      - CORS_ENABLED=true
+      - CORS_ALLOWED_ORIGINS=*
+      - CORS_ALLOWED_METHODS=GET, OPTIONS
+      - CORS_ALLOWED_HEADERS=Content-Type
+      - CORS_MAX_AGE=86400
     ports:
       - "3000:3000"
     volumes:
       - ./assets:/app/assets
-    environment:
-      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
 ```
 
-Then run:
+Run with:
 ```bash
 docker-compose up -d
 ```
@@ -170,6 +312,31 @@ docker-compose up -d
 docker build -t staticmap-osm-generator .
 docker run -p 3000:3000 staticmap-osm-generator
 ```
+
+## Production Deployment
+
+### Recommended Setup
+
+```
+[Client] → [CDN/Reverse Proxy] → [Load Balancer] → [Docker Container]
+           ↓                      ↓
+           Rate Limiting          SSL/TLS Termination
+           DDoS Protection        Health Checks
+           Caching                Load Balancing
+```
+
+When deploying behind a reverse proxy or CDN:
+
+1. **Disable CORS** in the application (handled by proxy):
+   ```bash
+   CORS_ENABLED=false
+   ```
+
+2. **Configure rate limiting** at the proxy level (not in the app)
+
+3. **Enable caching** at the CDN/proxy level:
+   - Cache `/map` responses based on query parameters
+   - Don't cache `/stats` or `/health`
 
 ## Requirements
 

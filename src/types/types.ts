@@ -27,6 +27,19 @@ export interface MarkerConfig {
   crossColor: string;
 }
 
+export interface CacheConfig {
+  maxSize: number;
+  ttlMinutes: number;
+}
+
+export interface CorsConfig {
+  enabled: boolean;
+  allowedOrigins: string;
+  allowedMethods: string;
+  allowedHeaders: string;
+  maxAge: number;
+}
+
 export interface Config {
   port: number;
   assetsDir: string;
@@ -35,4 +48,6 @@ export interface Config {
   marker: MarkerConfig;
   maxZoom: number;
   minZoom: number;
+  cache?: CacheConfig;
+  cors?: CorsConfig;
 }

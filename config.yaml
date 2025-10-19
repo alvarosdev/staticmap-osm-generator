@@ -10,3 +10,16 @@ marker:
   crossColor: "white"
 maxZoom: 20
 minZoom: 0
+
+# Tile cache configuration
+cache:
+  maxSize: 1000      # Maximum number of tiles to cache in memory
+  ttlMinutes: 60     # Time to live for cached tiles in minutes
+
+# CORS configuration
+cors:
+  enabled: true                    # Enable/disable CORS
+  allowedOrigins: "*"              # Allowed origins (* for all)
+  allowedMethods: "GET, OPTIONS"   # Allowed HTTP methods
+  allowedHeaders: "Content-Type"   # Allowed headers
+  maxAge: 86400                    # Preflight cache duration in seconds (24 hours)
