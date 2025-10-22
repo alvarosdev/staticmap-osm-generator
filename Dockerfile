@@ -14,6 +14,7 @@ RUN bun install --production
 # Copy configuration and source
 COPY tsconfig.json config.yaml ./
 COPY src ./src
+COPY assets ./assets
 
 # Create cache directory if not exists
 RUN mkdir -p /app/cache

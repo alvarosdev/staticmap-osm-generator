@@ -153,7 +153,8 @@ export async function generateSingleTileMap({ lat, lon, zoom, markerName, anchor
     const padX = 8;
     const padY = 6;
     const fontSize = 12;
-    ctx.font = `${fontSize}px sans-serif`;
+    // TODO: Make this configurable
+    ctx.font = `${fontSize}px "Cabin Condensed"`;
     ctx.textBaseline = "alphabetic";
     ctx.textAlign = "left";
     const metrics = ctx.measureText(attrib.text);

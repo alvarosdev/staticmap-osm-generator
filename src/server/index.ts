@@ -6,6 +6,10 @@ import { initTileCache } from "@/core/tileCache.js";
 import { logger } from "./logger.js";
 import { getSecurityHeaders, validateNumber, validateInteger } from "./security.js";
 import sharp from "sharp";
+import { registerFont } from "canvas";
+
+// TODO: Make this configurable
+registerFont("assets/fonts/CabinCondensed-SemiBold.ttf", { family: "Cabin Condensed" });
 
 /**
  * Handles the map generation or serving from cache.
