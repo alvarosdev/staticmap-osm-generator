@@ -99,7 +99,7 @@ Health check endpoint for monitoring and load balancers.
 **Response:**
 - `200 OK` – Server is healthy
 
-### `GET /stats`
+### `GET /cache/stats`
 
 Returns cache statistics for monitoring performance.
 
@@ -281,13 +281,13 @@ docker run -d \
 
 ### Using Docker Compose
 
-The included `docker-compose.yml` has all configuration ready:
+Use the published image from GitHub Container Registry:
 
 ```yaml
 version: "3.9"
 services:
   staticmap:
-    build: .
+    image: ghcr.io/alvarosdev/staticmap-osm-generator:latest
     container_name: staticmap-osm-generator
     environment:
       - NODE_ENV=production
@@ -314,7 +314,7 @@ services:
 
 Run with:
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 ### Building Your Own Image
@@ -322,6 +322,8 @@ docker-compose up -d
 ```bash
 docker build -t staticmap-osm-generator .
 docker run -p 3000:3000 staticmap-osm-generator
+
+Note: Docker build includes a Biome linter check stage and will fail if lint errors are found.
 ```
 
 ## Production Deployment
