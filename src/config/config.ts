@@ -14,7 +14,7 @@ export const DEFAULT_CONFIG: Config = {
 		borderColor: 'black',
 		crossColor: 'white',
 	},
-	maxZoom: 20,
+	maxZoom: 19,
 	minZoom: 0,
 	anchors: [
 		{ name: 'center', x: 0.5, y: 0.5 },
@@ -43,7 +43,7 @@ export const DEFAULT_CONFIG: Config = {
 	},
 	attribution: {
 		enabled: true,
-		text: '© OpenStreetMap',
+		text: '© OpenStreetMap contributors',
 		backgroundColor: '#000000',
 		textColor: '#FFFFFF',
 		opacity: 0.5,

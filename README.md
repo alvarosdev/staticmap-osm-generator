@@ -65,7 +65,7 @@ Generates a 256×256 WebP map tile with a centered marker at the specified coord
 |-----------|---------|----------------|--------------------------------|
 | `lat`     | number  | `-90` to `90`  | Latitude coordinate            |
 | `lon`     | number  | `-180` to `180`| Longitude coordinate           |
-| `zoom`    | integer | `0` to `20`    | Zoom level (higher = more detail) |
+| `zoom`    | integer | `0` to `19`    | Zoom level (higher = more detail) |
 | `marker`  | string  | defined in config | Optional marker image name |
 | `anchor`  | string  | defined in config | Optional anchor name (defaults from marker or config) |
 | `scale`   | integer | `1` to `4`      | Output scale multiplier (e.g., 2 → 512×512) |
@@ -158,10 +158,12 @@ This ensures your disk cache persists between container restarts.
 
 **OSM Tile Fetching:**
 - In-memory LRU cache for OSM tiles with configurable size and TTL
-- Rate limiting (2 concurrent requests, 2 req/sec) to respect OSM policies
+- Rate limiting (2 concurrent requests, 2 req/sec by default) to respect OSM policies
 - Automatic retries with exponential backoff (3 attempts: 1s → 2s → 4s)
 - Request timeouts (10s) and proper User-Agent identification
 - Parallel fetching of the 4 tiles needed per map
+
+> For heavy/production traffic, do not use the public `tile.openstreetmap.org`. Use your own tile server or a commercial provider. Consider increasing the tile cache TTL (e.g., 24h+) via `config.yaml` to reduce upstream requests.
 
 **Bun Native APIs:**
 - `Bun.CryptoHasher` for fast synchronous hashing (~5x faster than Web Crypto)
@@ -190,7 +192,7 @@ minZoom: 0
 # Optional attribution bar at the bottom of the image
 attribution:
   enabled: true
-  text: "© OpenStreetMap"
+  text: "© OpenStreetMap contributors"
   backgroundColor: "#000000"
   textColor: "#FFFFFF"
   opacity: 0.5
@@ -221,6 +223,13 @@ cors:
 | `CORS_ALLOWED_METHODS` | Allowed HTTP methods | `GET, OPTIONS` |
 | `CORS_ALLOWED_HEADERS` | Allowed headers | `Content-Type` |
 | `CORS_MAX_AGE` | Preflight cache duration (seconds) | `86400` |
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `OSM_USER_AGENT` | Custom User-Agent for tile requests (identify your app and contact) | `staticmap-osm-generator/1.0 (+https://github.com/alvarosdev/staticmap-osm-generator)` |
+| `OSM_REFERER` | Optional Referer header sent to tile server | empty |
+| `OSM_MAX_CONCURRENT` | Max concurrent tile requests | `2` |
+| `OSM_REQUESTS_PER_SECOND` | Global request rate (tiles/sec) | `2` |
 
 ### CORS Configuration Examples
 

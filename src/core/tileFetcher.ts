@@ -56,7 +56,26 @@ class RateLimiter {
 	}
 }
 
-const rateLimiter = new RateLimiter(2, 2); // Max 2 concurrent, 2 req/sec
+const rateLimiter = new RateLimiter(
+	Number.isFinite(parseInt(Bun.env.OSM_MAX_CONCURRENT || '', 10))
+		? Math.max(1, parseInt(Bun.env.OSM_MAX_CONCURRENT as string, 10))
+		: 2,
+	Number.isFinite(parseFloat(Bun.env.OSM_REQUESTS_PER_SECOND || ''))
+		? Math.max(0.1, parseFloat(Bun.env.OSM_REQUESTS_PER_SECOND as string))
+		: 2
+); // Defaults: Max 2 concurrent, 2 req/sec
+
+function getOSMHeaders(): Record<string, string> {
+	const defaultUA =
+		'staticmap-osm-generator/1.0 (+https://github.com/alvarosdev/staticmap-osm-generator)';
+	const ua = (Bun.env.OSM_USER_AGENT || '').trim() || defaultUA;
+	const referer = (Bun.env.OSM_REFERER || '').trim();
+	const headers: Record<string, string> = {
+		'User-Agent': ua,
+	};
+	if (referer) headers.Referer = referer;
+	return headers;
+}
 
 /**
  * Fetch a tile with retry logic and exponential backoff
@@ -75,10 +94,7 @@ async function fetchWithRetry(
 
 			const res = await fetch(url, {
 				signal: controller.signal,
-				headers: {
-					'User-Agent':
-						'staticmap-osm-generator/1.0 (+https://github.com/alvarosdev/staticmap-osm-generator)',
-				},
+				headers: getOSMHeaders(),
 			});
 
 			clearTimeout(timeoutId);

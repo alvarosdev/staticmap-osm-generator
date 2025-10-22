@@ -7,7 +7,7 @@ marker:
   fillColor: "#e53935"
   borderColor: "black"
   crossColor: "white"
-maxZoom: 20
+maxZoom: 19
 minZoom: 0
 
 # Predefined anchors for marker images (normalized 0-1 coordinates)
@@ -77,7 +77,7 @@ cors:
 
 attribution:
   enabled: true
-  text: "© OpenStreetMap"
+  text: "© OpenStreetMap contributors"
   backgroundColor: "#000000"
   textColor: "#FFFFFF"
   opacity: 0.5
