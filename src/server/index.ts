@@ -5,32 +5,34 @@ import { getCacheStats } from "@/core/tileFetcher.js";
 import { initTileCache } from "@/core/tileCache.js";
 import { logger } from "./logger.js";
 import { getSecurityHeaders, validateNumber, validateInteger } from "./security.js";
+import sharp from "sharp";
 
 /**
  * Handles the map generation or serving from cache.
  * Uses Bun.file().exists() instead of Node.js fs.existsSync for better performance.
  */
-async function handleMapRequest(lat: number, lon: number, zoom: number): Promise<Response> {
-  const hash = generateHash(zoom, lat, lon);
-  const filePath = `${CONFIG.assetsDir}/${hash}.png`;
+async function handleMapRequest(lat: number, lon: number, zoom: number, markerName?: string, anchorName?: string): Promise<Response> {
+  const hash = generateHash(zoom, lat, lon, markerName, anchorName);
+  const filePath = `${CONFIG.cacheDir}/${hash}.webp`;
   const file = Bun.file(filePath);
 
   if (await file.exists()) {
     logger.info({ hash, filePath }, 'Serving cached image');
     return new Response(file, {
       headers: {
-        "Content-Type": "image/png",
+        "Content-Type": "image/webp",
         "Cache-Control": "public, max-age=31536000, immutable",
         ...getSecurityHeaders(CONFIG.cors!),
       },
     });
   } else {
     logger.info({ hash }, 'Generating new image');
-    const pngBuffer = await generateSingleTileMap({ lat, lon, zoom }, CONFIG);
-    await Bun.write(filePath, pngBuffer);
+    const pngBuffer = await generateSingleTileMap({ lat, lon, zoom, markerName, anchorName }, CONFIG);
+    const webpBuffer = await sharp(pngBuffer).webp({ quality: 85 }).toBuffer();
+    await Bun.write(filePath, webpBuffer);
     return new Response(Bun.file(filePath), {
       headers: {
-        "Content-Type": "image/png",
+        "Content-Type": "image/webp",
         "Cache-Control": "public, max-age=31536000, immutable",
         ...getSecurityHeaders(CONFIG.cors!),
       },
@@ -107,8 +109,44 @@ async function handleMapRequest(lat: number, lon: number, zoom: number): Promise
         const lon = lonValidation.value!;
         const zoom = zoomValidation.value!;
 
+        // Optional marker and anchor params
+        const markerParam = url.searchParams.get("marker")?.trim();
+        const anchorParam = url.searchParams.get("anchor")?.trim();
+
+        // Resolve marker name: provided -> default -> undefined
+        const availableMarkers = CONFIG.markers;
+        const availableAnchors = CONFIG.anchors;
+        const defaultMarker = CONFIG.defaultMarker;
+        const defaultAnchor = CONFIG.defaultAnchor || 'center';
+
+        const markerName = markerParam || defaultMarker;
+        if (markerParam) {
+          const markerExists = availableMarkers.some(m => m.name === markerParam);
+          if (!markerExists) {
+            logger.warn({ markerParam }, 'Invalid marker');
+            return new Response(`marker must be one of: ${(availableMarkers.map(m => m.name).join(', ') || 'none configured')}` , {
+              status: 400,
+              headers: { "Content-Type": "text/plain", ...getSecurityHeaders(CONFIG.cors!) },
+            });
+          }
+        }
+        // Validate anchor: user-provided -> marker's default -> config default
+        let anchorName = anchorParam;
+        if (!anchorName) {
+          const foundMarker = availableMarkers.find(m => m.name === markerName);
+          anchorName = foundMarker?.anchor || defaultAnchor;
+        }
+        const anchorValid = availableAnchors.some(a => a.name === anchorName);
+        if (!anchorValid) {
+          logger.warn({ anchorName }, 'Invalid anchor');
+          return new Response(`anchor must be one of: ${(availableAnchors.map(a => a.name).join(', ') || 'none configured')}` , {
+            status: 400,
+            headers: { "Content-Type": "text/plain", ...getSecurityHeaders(CONFIG.cors!) },
+          });
+        }
+
         try {
-          return await handleMapRequest(lat, lon, zoom);
+          return await handleMapRequest(lat, lon, zoom, markerName || undefined, anchorName || undefined);
         } catch (error) {
           logger.error({ error: error instanceof Error ? error.message : String(error), lat, lon, zoom }, 'Error generating map');
           return new Response("Internal Server Error", {

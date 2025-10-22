@@ -17,6 +17,8 @@ export interface GenerateTileParams {
   lat: number;
   lon: number;
   zoom: number;
+  markerName?: string;
+  anchorName?: string;
 }
 
 export interface MarkerConfig {
@@ -25,6 +27,27 @@ export interface MarkerConfig {
   borderColor: string;
   shadowColor: string;
   crossColor: string;
+}
+
+export interface AnchorDefinition {
+  name: string; // e.g., "center", "bottom-center"
+  // normalized anchor within the marker image: (0,0)=top-left, (1,1)=bottom-right
+  x: number;
+  y: number;
+}
+
+export interface MarkerImageDefinition {
+  name: string; // human-friendly name, e.g., "blue_pin"
+  file: string; // relative path, e.g., "markers/pin.png"
+  anchor: string; // name of a defined anchor
+}
+
+export interface ImageShadowConfig {
+  enabled: boolean;
+  color: string;
+  blur: number;
+  offsetX: number;
+  offsetY: number;
 }
 
 export interface CacheConfig {
@@ -40,14 +63,29 @@ export interface CorsConfig {
   maxAge: number;
 }
 
+export interface AttributionConfig {
+  enabled?: boolean;
+  text: string;
+  backgroundColor: string;
+  textColor: string;
+  opacity: number;
+}
+
 export interface Config {
   port: number;
-  assetsDir: string;
+  cacheDir: string;
   tileSize: number;
   osmBaseUrl: string;
   marker: MarkerConfig;
   maxZoom: number;
   minZoom: number;
+  // Custom marker images and anchors
+  anchors: AnchorDefinition[];
+  markers: MarkerImageDefinition[];
+  defaultMarker: string; // name of default marker image; if not set, fallback to circle
+  defaultAnchor: string; // name of default anchor to use when not specified
+  imageMarkerShadow: ImageShadowConfig;
   cache?: CacheConfig;
   cors?: CorsConfig;
+  attribution?: AttributionConfig;
 }

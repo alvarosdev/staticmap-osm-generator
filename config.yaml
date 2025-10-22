@@ -1,5 +1,5 @@
 port: 3000
-assetsDir: "assets"
+cacheDir: "cache"
 tileSize: 256
 osmBaseUrl: "https://tile.openstreetmap.org"
 marker:
@@ -10,6 +10,56 @@ marker:
   crossColor: "white"
 maxZoom: 20
 minZoom: 0
+
+# Predefined anchors for marker images (normalized 0-1 coordinates)
+anchors:
+  - name: center
+    x: 0.5
+    y: 0.5
+  - name: top-left
+    x: 0
+    y: 0
+  - name: top-center
+    x: 0.5
+    y: 0
+  - name: top-right
+    x: 1
+    y: 0
+  - name: bottom-left
+    x: 0
+    y: 1
+  - name: bottom-center
+    x: 0.5
+    y: 1
+  - name: bottom-right
+    x: 1
+    y: 1
+  - name: left-center
+    x: 0
+    y: 0.5
+  - name: right-center
+    x: 1
+    y: 0.5
+  - name: bottom
+    x: 0.5
+    y: 1
+
+# Custom marker images
+markers:
+  - name: pin
+    file: assets/markers/pin.png
+    anchor: bottom-left
+  - name: pointer
+    file: assets/markers/pointer.png
+    anchor: bottom-center
+  - name: flag
+    file: assets/markers/flag.png
+    anchor: bottom-center
+
+# Defaults when query params are not provided
+defaultMarker: pin
+defaultAnchor: center
+
 
 # Tile cache configuration
 cache:
@@ -23,3 +73,17 @@ cors:
   allowedMethods: "GET, OPTIONS"   # Allowed HTTP methods
   allowedHeaders: "Content-Type"   # Allowed headers
   maxAge: 86400                    # Preflight cache duration in seconds (24 hours)
+
+imageMarkerShadow:
+  enabled: true
+  color: "rgba(0, 0, 0, 0.35)"
+  blur: 6
+  offsetX: 0
+  offsetY: 2
+
+attribution:
+  enabled: true
+  text: "© OpenStreetMap"
+  backgroundColor: "#000000"
+  textColor: "#FFFFFF"
+  opacity: 0.5

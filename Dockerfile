@@ -8,19 +8,20 @@ WORKDIR /app
 
 # Install dependencies
 COPY bun.lock package.json ./
-RUN bun install --production --frozen-lockfile
+# Install with updated dependencies (sharp prebuilt binaries will be fetched)
+RUN bun install --production
 
-# Copy configuration, source, and assets
+# Copy configuration and source
 COPY tsconfig.json config.yaml ./
 COPY src ./src
 
-# Create assets directory if not exists
-RUN mkdir -p /app/assets
+# Create cache directory if not exists
+RUN mkdir -p /app/cache
 
 # Set environment variables
 ENV NODE_ENV=production
 ENV PORT=3000
-ENV ASSETS_DIR=/app/assets
+ENV CACHE_DIR=/app/cache
 
 EXPOSE 3000
 

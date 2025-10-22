@@ -7,7 +7,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - ASSETS_DIR=/app/assets
+      - CACHE_DIR=/app/cache
       # CORS configuration (optional - defaults from config.yaml)
       - CORS_ENABLED=true
       - CORS_ALLOWED_ORIGINS=*
@@ -17,7 +17,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./assets:/app/assets
+      - ./cache:/app/cache
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s

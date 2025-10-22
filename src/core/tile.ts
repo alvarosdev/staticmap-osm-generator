@@ -25,7 +25,7 @@ export function latLonToTileXY(lat: number, lon: number, z: number, tileSize: nu
 /**
  * Generates a PNG buffer with a single OSM tile and a marker at the specified lat/lon.
  */
-export async function generateSingleTileMap({ lat, lon, zoom }: GenerateTileParams, config: Config): Promise<Buffer> {
+export async function generateSingleTileMap({ lat, lon, zoom, markerName, anchorName }: GenerateTileParams, config: Config): Promise<Buffer> {
   const tileSize = config.tileSize;
   const { xtileFloat, ytileFloat } = latLonToTileXY(lat, lon, zoom, tileSize);
   const worldX = xtileFloat * tileSize;
@@ -67,39 +67,111 @@ export async function generateSingleTileMap({ lat, lon, zoom }: GenerateTilePara
     ctx.drawImage(image, drawX, drawY);
   }
 
-  // Draw visible marker (circle with border)
-  const r = config.marker.radius;
+  // Draw marker
   const centerX = tileSize / 2;
   const centerY = tileSize / 2;
+  const TARGET_SIZE = 32; // always 32x32 as requested
 
-  // Thick white shadow for visibility over any background
-  ctx.beginPath();
-  ctx.arc(centerX, centerY, r + 3, 0, Math.PI * 2);
-  ctx.fillStyle = config.marker.shadowColor;
-  ctx.fill();
+  // Try to draw image marker if configured
+  let drewImageMarker = false;
+  const markers = config.markers;
+  const anchors = config.anchors;
+  const selectedMarker = markerName ? markers.find(m => m.name === markerName) : undefined;
+  const selectedAnchor = anchorName ? anchors.find(a => a.name === anchorName) : undefined;
 
-  // Thin black border
-  ctx.beginPath();
-  ctx.arc(centerX, centerY, r + 3, 0, Math.PI * 2);
-  ctx.strokeStyle = config.marker.borderColor;
-  ctx.lineWidth = 2;
-  ctx.stroke();
+  if (selectedMarker && selectedAnchor) {
+    try {
+      const img = await loadImage(selectedMarker.file);
+      const dx = centerX - selectedAnchor.x * TARGET_SIZE;
+      const dy = centerY - selectedAnchor.y * TARGET_SIZE;
+      // Apply global shadow for image markers if enabled
+      if (config.imageMarkerShadow?.enabled) {
+        ctx.save();
+        ctx.shadowColor = config.imageMarkerShadow.color;
+        ctx.shadowBlur = config.imageMarkerShadow.blur;
+        ctx.shadowOffsetX = config.imageMarkerShadow.offsetX;
+        ctx.shadowOffsetY = config.imageMarkerShadow.offsetY;
+        ctx.drawImage(img, 0, 0, img.width as number, img.height as number, dx, dy, TARGET_SIZE, TARGET_SIZE);
+        ctx.restore();
+      } else {
+        ctx.drawImage(img, 0, 0, img.width as number, img.height as number, dx, dy, TARGET_SIZE, TARGET_SIZE);
+      }
+      drewImageMarker = true;
+    } catch (e) {
+      // Fallback to circle marker if image fails to load
+      drewImageMarker = false;
+    }
+  }
 
-  // Red point
-  ctx.beginPath();
-  ctx.arc(centerX, centerY, r, 0, Math.PI * 2);
-  ctx.fillStyle = config.marker.fillColor;
-  ctx.fill();
+  if (!drewImageMarker) {
+    // Fallback: visible circle marker (existing style)
+    const r = config.marker.radius;
 
-  // Small cross in the center
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = config.marker.crossColor;
-  ctx.beginPath();
-  ctx.moveTo(centerX - r, centerY);
-  ctx.lineTo(centerX + r, centerY);
-  ctx.moveTo(centerX, centerY - r);
-  ctx.lineTo(centerX, centerY + r);
-  ctx.stroke();
+    // Filled circle with optional global shadow (unified style)
+    if (config.imageMarkerShadow?.enabled) {
+      ctx.save();
+      ctx.shadowColor = config.imageMarkerShadow.color;
+      ctx.shadowBlur = config.imageMarkerShadow.blur;
+      ctx.shadowOffsetX = config.imageMarkerShadow.offsetX;
+      ctx.shadowOffsetY = config.imageMarkerShadow.offsetY;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, r, 0, Math.PI * 2);
+      ctx.fillStyle = config.marker.fillColor;
+      ctx.fill();
+      ctx.restore();
+    } else {
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, r, 0, Math.PI * 2);
+      ctx.fillStyle = config.marker.fillColor;
+      ctx.fill();
+    }
+
+    // Thin border without shadow
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, r, 0, Math.PI * 2);
+    ctx.strokeStyle = config.marker.borderColor;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Small cross in the center (no shadow)
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = config.marker.crossColor;
+    ctx.beginPath();
+    ctx.moveTo(centerX - r, centerY);
+    ctx.lineTo(centerX + r, centerY);
+    ctx.moveTo(centerX, centerY - r);
+    ctx.lineTo(centerX, centerY + r);
+    ctx.stroke();
+  }
+
+  // Draw attribution bar (optional)
+  const attrib = config.attribution;
+  if (attrib && attrib.enabled !== false && attrib.text) {
+    const padX = 8;
+    const padY = 6;
+    const fontSize = 12;
+    ctx.font = `${fontSize}px sans-serif`;
+    ctx.textBaseline = "alphabetic";
+    ctx.textAlign = "left";
+    const metrics = ctx.measureText(attrib.text);
+    const textHeight = (metrics.actualBoundingBoxAscent || fontSize * 0.8) + (metrics.actualBoundingBoxDescent || fontSize * 0.2);
+    const barHeight = Math.ceil(textHeight + padY * 2);
+    const barY = canvas.height - barHeight;
+
+    // Background with opacity
+    ctx.save();
+    const prevAlpha = ctx.globalAlpha;
+    ctx.globalAlpha = Math.max(0, Math.min(1, attrib.opacity ?? 0.5));
+    ctx.fillStyle = attrib.backgroundColor || "#000000";
+    ctx.fillRect(0, barY, canvas.width, barHeight);
+    ctx.globalAlpha = prevAlpha;
+
+    // Text
+    ctx.fillStyle = attrib.textColor || "#FFFFFF";
+    const textY = barY + padY + (metrics.actualBoundingBoxAscent || fontSize * 0.8);
+    ctx.fillText(attrib.text, padX, textY);
+    ctx.restore();
+  }
 
   return canvas.toBuffer("image/png");
 }

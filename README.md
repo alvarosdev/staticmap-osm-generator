@@ -2,7 +2,7 @@
 
 > ⚠️ **Proof of concept** – Not intended for production use.
 
-HTTP server that generates cached PNG map tiles from OpenStreetMap with custom markers.
+HTTP server that generates cached WebP map tiles from OpenStreetMap with custom markers.
 
 ## Background
 
@@ -29,7 +29,7 @@ Pull and run the pre-built image from GitHub Container Registry:
 docker pull ghcr.io/alvarosdev/staticmap-osm-generator:latest
 
 docker run -p 3000:3000 \
-  -v $(pwd)/assets:/app/assets \
+  -v $(pwd)/cache:/app/cache \
   ghcr.io/alvarosdev/staticmap-osm-generator:latest
 ```
 
@@ -58,7 +58,7 @@ Server runs on `http://localhost:3000` by default.
 
 ### `GET /map`
 
-Generates a 256×256 PNG map tile with a centered marker at the specified coordinates.
+Generates a 256×256 WebP map tile with a centered marker at the specified coordinates.
 
 **Query Parameters:**
 | Parameter | Type    | Range          | Description                    |
@@ -70,14 +70,14 @@ Generates a 256×256 PNG map tile with a centered marker at the specified coordi
 **Example Request:**
 ```bash
 # Buenos Aires, Argentina at zoom level 12
-curl "http://localhost:3000/map?lat=-34.6037&lon=-58.3816&zoom=12" -o map.png
+curl "http://localhost:3000/map?lat=-34.6037&lon=-58.3816&zoom=12" -o map.webp
 
 # New York City, USA at zoom level 15
-curl "http://localhost:3000/map?lat=40.7128&lon=-74.0060&zoom=15" -o nyc.png
+curl "http://localhost:3000/map?lat=40.7128&lon=-74.0060&zoom=15" -o nyc.webp
 ```
 
 **Responses:**
-- `200 OK` – Returns PNG image (Content-Type: `image/png`)
+- `200 OK` – Returns WebP image (Content-Type: `image/webp`)
 - `400 Bad Request` – Invalid or missing parameters
 - `500 Internal Server Error` – Server-side error
 
@@ -86,7 +86,7 @@ curl "http://localhost:3000/map?lat=40.7128&lon=-74.0060&zoom=15" -o nyc.png
 2. Checks disk cache for existing image
 3. If not cached, fetches 4 OSM tiles in parallel (with memory cache)
 4. Composes tiles and draws custom marker at center
-5. Saves to disk cache and returns PNG with appropriate headers
+5. Saves to disk cache and returns WebP with appropriate headers
 
 ### `GET /health`
 
@@ -115,7 +115,7 @@ Returns cache statistics for monitoring performance.
 The server implements a **dual-layer caching system** for optimal performance:
 
 ### 1. Disk Cache (Generated Maps)
-- **Location**: `assets/` directory
+- **Location**: `cache/` directory
 - **Purpose**: Stores final generated map images
 - **Key**: Content hash from `zoom`, `lat`, `lon`
 - **Persistence**: Survives server restarts
@@ -135,7 +135,7 @@ The server implements a **dual-layer caching system** for optimal performance:
 
 **Docker volume mount example:**
 ```bash
-docker run -p 3000:3000 -v $(pwd)/assets:/app/assets ghcr.io/alvarosdev/staticmap-osm-generator:latest
+docker run -p 3000:3000 -v $(pwd)/cache:/app/cache ghcr.io/alvarosdev/staticmap-osm-generator:latest
 ```
 
 This ensures your disk cache persists between container restarts.
@@ -172,7 +172,7 @@ Edit `config.yaml` or use environment variables:
 
 ```yaml
 port: 3000
-assetsDir: assets
+cacheDir: cache
 tileSize: 256
 osmBaseUrl: https://tile.openstreetmap.org
 marker:
@@ -203,7 +203,7 @@ cors:
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `PORT` | Server port | `3000` |
-| `ASSETS_DIR` | Cache directory path | `assets` |
+| `CACHE_DIR` | Cache directory path | `cache` |
 | `NODE_ENV` | Environment mode | `production` |
 | `CORS_ENABLED` | Enable CORS | `true` |
 | `CORS_ALLOWED_ORIGINS` | Allowed origins | `*` |
@@ -263,7 +263,7 @@ docker pull ghcr.io/alvarosdev/staticmap-osm-generator:latest
 docker run -d \
   --name staticmap-server \
   -p 3000:3000 \
-  -v $(pwd)/assets:/app/assets \
+  -v $(pwd)/cache:/app/cache \
   -e PORT=3000 \
   ghcr.io/alvarosdev/staticmap-osm-generator:latest
 ```
@@ -281,7 +281,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - ASSETS_DIR=/app/assets
+      - CACHE_DIR=/app/cache
       # CORS configuration (optional)
       - CORS_ENABLED=true
       - CORS_ALLOWED_ORIGINS=*
@@ -291,7 +291,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./assets:/app/assets
+      - ./cache:/app/cache
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s
@@ -341,6 +341,9 @@ When deploying behind a reverse proxy or CDN:
 ## Requirements
 
 - **Docker** (recommended) or [Bun](https://bun.sh) v1.3.0+
+- **sharp** for WebP conversion (installed automatically when using Docker).
+
+> If running locally without Docker, install dependencies with `bun install` to fetch `sharp` prebuilt binaries. On first install it may download platform-specific binaries.
 - Internet access to fetch OSM tiles
 
 ## License
