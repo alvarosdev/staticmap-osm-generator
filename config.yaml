@@ -54,7 +54,7 @@ markers:
     anchor: bottom-center
   - name: flag
     file: assets/markers/flag.png
-    anchor: bottom-center
+    anchor: bottom-left
 
 # Defaults when query params are not provided
 defaultMarker: pin

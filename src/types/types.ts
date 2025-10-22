@@ -19,6 +19,7 @@ export interface GenerateTileParams {
   zoom: number;
   markerName?: string;
   anchorName?: string;
+  outputScale?: number;
 }
 
 export interface MarkerConfig {

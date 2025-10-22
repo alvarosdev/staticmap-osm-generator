@@ -11,8 +11,8 @@ import sharp from "sharp";
  * Handles the map generation or serving from cache.
  * Uses Bun.file().exists() instead of Node.js fs.existsSync for better performance.
  */
-async function handleMapRequest(lat: number, lon: number, zoom: number, markerName?: string, anchorName?: string): Promise<Response> {
-  const hash = generateHash(zoom, lat, lon, markerName, anchorName);
+async function handleMapRequest(lat: number, lon: number, zoom: number, markerName?: string, anchorName?: string, scale: number = 1): Promise<Response> {
+  const hash = generateHash(zoom, lat, lon, markerName, anchorName, scale);
   const filePath = `${CONFIG.cacheDir}/${hash}.webp`;
   const file = Bun.file(filePath);
 
@@ -27,7 +27,7 @@ async function handleMapRequest(lat: number, lon: number, zoom: number, markerNa
     });
   } else {
     logger.info({ hash }, 'Generating new image');
-    const pngBuffer = await generateSingleTileMap({ lat, lon, zoom, markerName, anchorName }, CONFIG);
+    const pngBuffer = await generateSingleTileMap({ lat, lon, zoom, markerName, anchorName, outputScale: scale }, CONFIG);
     const webpBuffer = await sharp(pngBuffer).webp({ quality: 85 }).toBuffer();
     await Bun.write(filePath, webpBuffer);
     return new Response(Bun.file(filePath), {
@@ -108,6 +108,9 @@ async function handleMapRequest(lat: number, lon: number, zoom: number, markerNa
         const lat = latValidation.value!;
         const lon = lonValidation.value!;
         const zoom = zoomValidation.value!;
+        // Optional scale param (1..4)
+        const scaleValidation = validateInteger(url.searchParams.get("scale"), 1, 4, "scale");
+        const scale = scaleValidation.valid && scaleValidation.value ? scaleValidation.value : 1;
 
         // Optional marker and anchor params
         const markerParam = url.searchParams.get("marker")?.trim();
@@ -146,7 +149,7 @@ async function handleMapRequest(lat: number, lon: number, zoom: number, markerNa
         }
 
         try {
-          return await handleMapRequest(lat, lon, zoom, markerName || undefined, anchorName || undefined);
+          return await handleMapRequest(lat, lon, zoom, markerName || undefined, anchorName || undefined, scale);
         } catch (error) {
           logger.error({ error: error instanceof Error ? error.message : String(error), lat, lon, zoom }, 'Error generating map');
           return new Response("Internal Server Error", {

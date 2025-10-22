@@ -66,6 +66,9 @@ Generates a 256×256 WebP map tile with a centered marker at the specified coord
 | `lat`     | number  | `-90` to `90`  | Latitude coordinate            |
 | `lon`     | number  | `-180` to `180`| Longitude coordinate           |
 | `zoom`    | integer | `0` to `20`    | Zoom level (higher = more detail) |
+| `marker`  | string  | defined in config | Optional marker image name |
+| `anchor`  | string  | defined in config | Optional anchor name (defaults from marker or config) |
+| `scale`   | integer | `1` to `4`      | Output scale multiplier (e.g., 2 → 512×512) |
 
 **Example Request:**
 ```bash
@@ -87,6 +90,7 @@ curl "http://localhost:3000/map?lat=40.7128&lon=-74.0060&zoom=15" -o nyc.webp
 3. If not cached, fetches 4 OSM tiles in parallel (with memory cache)
 4. Composes tiles and draws custom marker at center
 5. Saves to disk cache and returns WebP with appropriate headers
+6. Cache key includes `scale`, avoiding collisions across resolutions
 
 ### `GET /health`
 
@@ -183,6 +187,14 @@ marker:
   crossColor: "white"
 maxZoom: 20
 minZoom: 0
+
+# Optional attribution bar at the bottom of the image
+attribution:
+  enabled: true
+  text: "© OpenStreetMap"
+  backgroundColor: "#000000"
+  textColor: "#FFFFFF"
+  opacity: 0.5
 
 # Tile cache configuration
 cache:

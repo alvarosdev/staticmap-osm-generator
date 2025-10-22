@@ -25,7 +25,8 @@ export function latLonToTileXY(lat: number, lon: number, z: number, tileSize: nu
 /**
  * Generates a PNG buffer with a single OSM tile and a marker at the specified lat/lon.
  */
-export async function generateSingleTileMap({ lat, lon, zoom, markerName, anchorName }: GenerateTileParams, config: Config): Promise<Buffer> {
+export async function generateSingleTileMap({ lat, lon, zoom, markerName, anchorName, outputScale }: GenerateTileParams, config: Config): Promise<Buffer> {
+  const scale = Math.max(1, Math.min(4, Math.floor(outputScale ?? 1)));
   const tileSize = config.tileSize;
   const { xtileFloat, ytileFloat } = latLonToTileXY(lat, lon, zoom, tileSize);
   const worldX = xtileFloat * tileSize;
@@ -39,8 +40,10 @@ export async function generateSingleTileMap({ lat, lon, zoom, markerName, anchor
   const offsetY = topLeftY - tileY0 * tileSize;
   const n = 2 ** zoom;
 
-  const canvas = createCanvas(tileSize, tileSize);
+  const canvas = createCanvas(tileSize * scale, tileSize * scale);
   const ctx = canvas.getContext("2d");
+  // Normalize drawing coordinates to logical tile size
+  ctx.scale(scale, scale);
 
   const tileFetches: Promise<TileInfo>[] = [];
   for (let row = 0; row <= 1; row++) {
@@ -70,7 +73,7 @@ export async function generateSingleTileMap({ lat, lon, zoom, markerName, anchor
   // Draw marker
   const centerX = tileSize / 2;
   const centerY = tileSize / 2;
-  const TARGET_SIZE = 32; // always 32x32 as requested
+  const TARGET_SIZE = 32; // logical size; will be scaled by ctx.scale
 
   // Try to draw image marker if configured
   let drewImageMarker = false;
@@ -156,14 +159,14 @@ export async function generateSingleTileMap({ lat, lon, zoom, markerName, anchor
     const metrics = ctx.measureText(attrib.text);
     const textHeight = (metrics.actualBoundingBoxAscent || fontSize * 0.8) + (metrics.actualBoundingBoxDescent || fontSize * 0.2);
     const barHeight = Math.ceil(textHeight + padY * 2);
-    const barY = canvas.height - barHeight;
+    const barY = tileSize - barHeight;
 
     // Background with opacity
     ctx.save();
     const prevAlpha = ctx.globalAlpha;
     ctx.globalAlpha = Math.max(0, Math.min(1, attrib.opacity ?? 0.5));
     ctx.fillStyle = attrib.backgroundColor || "#000000";
-    ctx.fillRect(0, barY, canvas.width, barHeight);
+    ctx.fillRect(0, barY, tileSize, barHeight);
     ctx.globalAlpha = prevAlpha;
 
     // Text
