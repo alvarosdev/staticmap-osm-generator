@@ -6,7 +6,6 @@ marker:
   radius: 8
   fillColor: "#e53935"
   borderColor: "black"
-  shadowColor: "rgba(255,255,255,0.9)"
   crossColor: "white"
 maxZoom: 20
 minZoom: 0
@@ -46,18 +45,19 @@ anchors:
 
 # Custom marker images
 markers:
-  - name: pin
-    file: assets/markers/pin.png
-    anchor: bottom-left
-  - name: pointer
-    file: assets/markers/pointer.png
+  - name: location
+    file: assets/markers/location.svg
     anchor: bottom-center
-  - name: flag
-    file: assets/markers/flag.png
-    anchor: bottom-left
+  - name: target
+    file: assets/markers/target.svg
+    anchor: center
+  - name: star
+    file: assets/markers/star.svg
+    anchor: center
+    fit: contain
 
 # Defaults when query params are not provided
-defaultMarker: pin
+defaultMarker: target
 defaultAnchor: center
 
 
@@ -74,12 +74,6 @@ cors:
   allowedHeaders: "Content-Type"   # Allowed headers
   maxAge: 86400                    # Preflight cache duration in seconds (24 hours)
 
-imageMarkerShadow:
-  enabled: true
-  color: "rgba(0, 0, 0, 0.35)"
-  blur: 6
-  offsetX: 0
-  offsetY: 2
 
 attribution:
   enabled: true

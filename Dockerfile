@@ -1,3 +1,21 @@
+FROM oven/bun:1.3 AS linter
+
+WORKDIR /app
+
+# Install dev dependencies (includes Biome)
+COPY bun.lock package.json ./
+RUN bun install
+
+# Copy project files needed for linting
+COPY tsconfig.json config.yaml ./
+COPY biome.json ./
+COPY src ./src
+COPY assets ./assets
+
+# Run linter check (no writes). Build will fail on lint errors.
+RUN bunx @biomejs/biome lint . --reporter summary
+
+
 FROM oven/bun:1.3
 
 LABEL maintainer="staticmap-osm-generator" \
@@ -6,7 +24,7 @@ LABEL maintainer="staticmap-osm-generator" \
 
 WORKDIR /app
 
-# Install dependencies
+# Install production dependencies only
 COPY bun.lock package.json ./
 # Install with updated dependencies (sharp prebuilt binaries will be fetched)
 RUN bun install --production

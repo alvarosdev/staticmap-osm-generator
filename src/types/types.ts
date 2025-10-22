@@ -1,92 +1,85 @@
+import type { Image } from 'canvas';
+
 export interface LatLonToTileResult {
-  xtile: number;
-  ytile: number;
-  xtileFloat: number;
-  ytileFloat: number;
-  xPx: number;
-  yPx: number;
+	xtile: number;
+	ytile: number;
+	xtileFloat: number;
+	ytileFloat: number;
+	xPx: number;
+	yPx: number;
 }
 
 export interface TileInfo {
-  image: any; // Canvas Image
-  drawX: number;
-  drawY: number;
+	image: Image; // Canvas Image
+	drawX: number;
+	drawY: number;
 }
 
 export interface GenerateTileParams {
-  lat: number;
-  lon: number;
-  zoom: number;
-  markerName?: string;
-  anchorName?: string;
-  outputScale?: number;
+	lat: number;
+	lon: number;
+	zoom: number;
+	markerName?: string;
+	anchorName?: string;
+	outputScale?: number;
 }
 
 export interface MarkerConfig {
-  radius: number;
-  fillColor: string;
-  borderColor: string;
-  shadowColor: string;
-  crossColor: string;
+	radius: number;
+	fillColor: string;
+	borderColor: string;
+	crossColor: string;
 }
 
 export interface AnchorDefinition {
-  name: string; // e.g., "center", "bottom-center"
-  // normalized anchor within the marker image: (0,0)=top-left, (1,1)=bottom-right
-  x: number;
-  y: number;
+	name: string; // e.g., "center", "bottom-center"
+	// normalized anchor within the marker image: (0,0)=top-left, (1,1)=bottom-right
+	x: number;
+	y: number;
 }
 
 export interface MarkerImageDefinition {
-  name: string; // human-friendly name, e.g., "blue_pin"
-  file: string; // relative path, e.g., "markers/pin.png"
-  anchor: string; // name of a defined anchor
-}
-
-export interface ImageShadowConfig {
-  enabled: boolean;
-  color: string;
-  blur: number;
-  offsetX: number;
-  offsetY: number;
+	name: string; // human-friendly name, e.g., "blue_pin"
+	file: string; // relative path, e.g., "markers/pin.png"
+	anchor: string; // name of a defined anchor
+	fit?: 'contain' | 'cover'; // optional resizing mode when rendering
 }
 
 export interface CacheConfig {
-  maxSize: number;
-  ttlMinutes: number;
+	maxSize: number;
+	ttlMinutes: number;
 }
 
 export interface CorsConfig {
-  enabled: boolean;
-  allowedOrigins: string;
-  allowedMethods: string;
-  allowedHeaders: string;
-  maxAge: number;
+	enabled: boolean;
+	allowedOrigins: string;
+	allowedMethods: string;
+	allowedHeaders: string;
+	maxAge: number;
 }
 
 export interface AttributionConfig {
-  enabled?: boolean;
-  text: string;
-  backgroundColor: string;
-  textColor: string;
-  opacity: number;
+	enabled?: boolean;
+	text: string;
+	backgroundColor: string;
+	textColor: string;
+	opacity: number;
 }
 
 export interface Config {
-  port: number;
-  cacheDir: string;
-  tileSize: number;
-  osmBaseUrl: string;
-  marker: MarkerConfig;
-  maxZoom: number;
-  minZoom: number;
-  // Custom marker images and anchors
-  anchors: AnchorDefinition[];
-  markers: MarkerImageDefinition[];
-  defaultMarker: string; // name of default marker image; if not set, fallback to circle
-  defaultAnchor: string; // name of default anchor to use when not specified
-  imageMarkerShadow: ImageShadowConfig;
-  cache?: CacheConfig;
-  cors?: CorsConfig;
-  attribution?: AttributionConfig;
+	port: number;
+	cacheDir: string;
+	tileSize: number;
+	osmBaseUrl: string;
+	marker: MarkerConfig;
+	maxZoom: number;
+	minZoom: number;
+	// Custom marker images and anchors
+	anchors: AnchorDefinition[];
+	markers: MarkerImageDefinition[];
+	defaultMarker: string; // name of default marker image; if not set, fallback to circle
+	defaultAnchor: string; // name of default anchor to use when not specified
+	cache?: CacheConfig;
+	cors?: CorsConfig;
+	attribution?: AttributionConfig;
 }
