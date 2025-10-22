@@ -1,5 +1,7 @@
 # staticmap-osm-generator
 
+<img src="/assets/map.webp" width="256px"/>
+
 > ⚠️ **Proof of concept** – Not intended for production use.
 
 HTTP server that generates cached WebP map tiles from OpenStreetMap with custom markers.
